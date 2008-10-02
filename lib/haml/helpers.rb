@@ -425,6 +425,28 @@ module Haml
       _erbout = _hamlout.buffer
       proc { |*args| proc.call(*args) }
     end
+    
+    # Performs the function of capture_haml, assuming <tt>local_buffer</tt>
+    # is where the output of block goes.
+    def capture_haml_with_buffer(local_buffer, *args, &block)
+      position = local_buffer.length
+
+      block.call(*args)
+
+      captured = local_buffer.slice!(position..-1)
+
+      min_tabs = nil
+      captured.each_line do |line|
+        tabs = line.index(/[^ ]/)
+        min_tabs ||= tabs
+        min_tabs = min_tabs > tabs ? tabs : min_tabs
+      end
+
+      result = captured.lines do |line|
+        line[min_tabs..-1]
+      end
+      result.to_s
+    end
 
     include ActionViewExtensions if self.const_defined? "ActionViewExtensions"
   end
