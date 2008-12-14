@@ -77,7 +77,11 @@ class EngineTest < Test::Unit::TestCase
     end
     Haml::Engine.new(text, options)
   end
-  
+
+  def test_empty_render
+    assert_equal "", render("")
+  end
+
   def test_flexible_tabulation
     assert_equal("<p>\n  foo\n</p>\n<q>\n  bar\n  <a>\n    baz\n  </a>\n</q>\n",
                  render("%p\n foo\n%q\n bar\n %a\n  baz"))
@@ -158,6 +162,20 @@ class EngineTest < Test::Unit::TestCase
     assert_equal("<p a='b' c='d' e='f'></p>\n", render("%p{:a => 'b',\n   :c => 'd',\n   :e => 'f'}"))
   end
 
+  def test_attr_hashes_not_modified
+    hash = {:color => 'red'}
+    assert_equal(<<HTML, render(<<HAML, :locals => {:hash => hash}))
+<div color='red'></div>
+<div class='special' color='red'></div>
+<div color='red'></div>
+HTML
+%div{hash}
+.special{hash}
+%div{hash}
+HAML
+    assert_equal(hash, {:color => 'red'})
+  end
+
   def test_end_of_file_multiline
     assert_equal("<p>0</p>\n<p>1</p>\n<p>2</p>\n", render("- for i in (0...3)\n  %p= |\n   i |"))
   end
@@ -207,6 +225,33 @@ RESULT
 SOURCE
   end
 
+  # Mostly a regression test
+  def test_both_case_indentation_work_with_deeply_nested_code
+    result = <<RESULT
+<h2>
+  other
+</h2>
+RESULT
+    assert_equal(result, render(<<HAML))
+- case 'other'
+- when 'test'
+  %h2
+    hi
+- when 'other'
+  %h2
+    other
+HAML
+    assert_equal(result, render(<<HAML))
+- case 'other'
+  - when 'test'
+    %h2
+      hi
+  - when 'other'
+    %h2
+      other
+HAML
+  end
+
   # HTML escaping tests
 
   def test_ampersand_equals_should_escape
@@ -252,28 +297,28 @@ SOURCE
   end
   
   def test_string_interpolation_should_be_esaped
-    assert_equal("<p>4&amp;3</p>\n", render("%p== #{2+2}&#{2+1}", :escape_html => true))
-    assert_equal("<p>4&3</p>\n", render("%p== #{2+2}&#{2+1}", :escape_html => false))
+    assert_equal("<p>4&amp;3</p>\n", render("%p== \#{2+2}&\#{2+1}", :escape_html => true))
+    assert_equal("<p>4&3</p>\n", render("%p== \#{2+2}&\#{2+1}", :escape_html => false))
   end
 
   def test_escaped_inline_string_interpolation
-    assert_equal("<p>4&amp;3</p>\n", render("%p&== #{2+2}&#{2+1}", :escape_html => true))
-    assert_equal("<p>4&amp;3</p>\n", render("%p&== #{2+2}&#{2+1}", :escape_html => false))
+    assert_equal("<p>4&amp;3</p>\n", render("%p&== \#{2+2}&\#{2+1}", :escape_html => true))
+    assert_equal("<p>4&amp;3</p>\n", render("%p&== \#{2+2}&\#{2+1}", :escape_html => false))
   end
 
   def test_unescaped_inline_string_interpolation
-    assert_equal("<p>4&3</p>\n", render("%p!== #{2+2}&#{2+1}", :escape_html => true))
-    assert_equal("<p>4&3</p>\n", render("%p!== #{2+2}&#{2+1}", :escape_html => false))
+    assert_equal("<p>4&3</p>\n", render("%p!== \#{2+2}&\#{2+1}", :escape_html => true))
+    assert_equal("<p>4&3</p>\n", render("%p!== \#{2+2}&\#{2+1}", :escape_html => false))
   end
 
   def test_escaped_string_interpolation
-    assert_equal("<p>\n  4&amp;3\n</p>\n", render("%p\n  &== #{2+2}&#{2+1}", :escape_html => true))
-    assert_equal("<p>\n  4&amp;3\n</p>\n", render("%p\n  &== #{2+2}&#{2+1}", :escape_html => false))
+    assert_equal("<p>\n  4&amp;3\n</p>\n", render("%p\n  &== \#{2+2}&\#{2+1}", :escape_html => true))
+    assert_equal("<p>\n  4&amp;3\n</p>\n", render("%p\n  &== \#{2+2}&\#{2+1}", :escape_html => false))
   end
 
   def test_unescaped_string_interpolation
-    assert_equal("<p>\n  4&3\n</p>\n", render("%p\n  !== #{2+2}&#{2+1}", :escape_html => true))
-    assert_equal("<p>\n  4&3\n</p>\n", render("%p\n  !== #{2+2}&#{2+1}", :escape_html => false))
+    assert_equal("<p>\n  4&3\n</p>\n", render("%p\n  !== \#{2+2}&\#{2+1}", :escape_html => true))
+    assert_equal("<p>\n  4&3\n</p>\n", render("%p\n  !== \#{2+2}&\#{2+1}", :escape_html => false))
   end
 
   def test_scripts_should_respect_escape_html_option
@@ -310,11 +355,36 @@ SOURCE
 
   def test_stop_eval
     assert_equal("", render("= 'Hello'", :suppress_eval => true))
-    assert_equal("", render("- puts 'foo'", :suppress_eval => true))
+    assert_equal("", render("- haml_concat 'foo'", :suppress_eval => true))
     assert_equal("<div id='foo' yes='no' />\n", render("#foo{:yes => 'no'}/", :suppress_eval => true))
     assert_equal("<div id='foo' />\n", render("#foo{:yes => 'no', :call => a_function() }/", :suppress_eval => true))
     assert_equal("<div />\n", render("%div[1]/", :suppress_eval => true))
-    assert_equal("", render(":ruby\n  puts 'hello'", :suppress_eval => true))
+    assert_equal("", render(":ruby\n  Kernel.puts 'hello'", :suppress_eval => true))
+  end
+
+  def test_doctypes
+    assert_equal('<!DOCTYPE html>',
+      render('!!!', :format => :html5).strip)
+    assert_equal('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
+      render('!!! strict').strip)
+    assert_equal('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Frameset//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-frameset.dtd">',
+      render('!!! frameset').strip)
+    assert_equal('<!DOCTYPE html PUBLIC "-//WAPFORUM//DTD XHTML Mobile 1.2//EN" "http://www.openmobilealliance.org/tech/DTD/xhtml-mobile12.dtd">',
+      render('!!! mobile').strip)
+    assert_equal('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML Basic 1.1//EN" "http://www.w3.org/TR/xhtml-basic/xhtml-basic11.dtd">',
+      render('!!! basic').strip)
+    assert_equal('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">',
+      render('!!! transitional').strip)
+    assert_equal('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">',
+      render('!!!').strip)
+    assert_equal('<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">',
+      render('!!! strict', :format => :html4).strip)
+    assert_equal('<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Frameset//EN" "http://www.w3.org/TR/html4/frameset.dtd">',
+      render('!!! frameset', :format => :html4).strip)
+    assert_equal('<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">',
+      render('!!! transitional', :format => :html4).strip)
+    assert_equal('<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">',
+      render('!!!', :format => :html4).strip)
   end
 
   def test_attr_wrapper
@@ -563,8 +633,11 @@ END
     assert_equal "<div class='foo'></div>\n", render(".foo", :format => :html4)
   end
 
-  def test_html_ignores_explicit_self_closing_declaration
-    assert_equal "<a></a>\n", render("%a/", :format => :html4)
+  def test_html_doesnt_add_slash_to_self_closing_tags
+    assert_equal "<a>\n", render("%a/", :format => :html4)
+    assert_equal "<a foo='2'>\n", render("%a{:foo => 1 + 1}/", :format => :html4)
+    assert_equal "<meta>\n", render("%meta", :format => :html4)
+    assert_equal "<meta foo='2'>\n", render("%meta{:foo => 1 + 1}", :format => :html4)
   end
 
   def test_html_ignores_xml_prolog_declaration

@@ -24,13 +24,9 @@ module Haml
 
           @options
         rescue Exception => e
-          raise e if e.is_a? SystemExit
+          raise e if @options[:trace] || e.is_a?(SystemExit)
 
-          $stderr.print "#{e.class} on line #{get_line e}: " if @options[:trace]
           $stderr.puts e.message
-
-          e.backtrace[1..-1].each { |t| $stderr.puts "  #{t}" } if @options[:trace]
-
           exit 1
         end
         exit 0
@@ -77,6 +73,7 @@ module Haml
         input_file, output_file = if input
                                     [nil, open_file(ARGV[0], 'w')]
                                   else
+                                    @options[:filename] = ARGV[0]
                                     [open_file(ARGV[0]), open_file(ARGV[1], 'w')]
                                   end
 
@@ -160,6 +157,7 @@ END
 
       def process_result
         super
+        @options[:for_engine][:filename] = @options[:filename] if @options[:filename]
         require File.dirname(__FILE__) + "/../#{@name.downcase}"
       end
     end
@@ -170,6 +168,7 @@ END
       def initialize(args)
         super
         @name = "Sass"
+        @options[:for_engine][:load_paths] = ['.'] + (ENV['SASSPATH'] || '').split(File::PATH_SEPARATOR)
       end
 
       def set_opts(opts)
@@ -183,9 +182,23 @@ END
                 'Line Comments. Emit comments in the generated CSS indicating the corresponding sass line.') do
           @options[:for_engine][:line_comments] = true
         end
+        opts.on('-i', '--interactive',
+                'Run an interactive SassScript shell.') do
+          @options[:interactive] = true
+        end
+        opts.on('-I', '--load-path PATH', 'Add a sass import path.') do |path|
+          @options[:for_engine][:load_paths] << path
+        end
       end
 
       def process_result
+        if @options[:interactive]
+          require 'sass'
+          require 'sass/repl'
+          ::Sass::Repl.run
+          return
+        end
+
         super
         input = @options[:input]
         output = @options[:output]
@@ -243,6 +256,10 @@ END
         opts.on('-I', '--load-path PATH', "Same as 'ruby -I'.") do |path|
           @options[:load_paths] << path
         end
+
+        opts.on('--debug', "Print out the precompiled Ruby source.") do
+          @options[:debug] = true
+        end
       end
 
       def process_result
@@ -262,6 +279,12 @@ END
 
           @options[:load_paths].each {|p| $LOAD_PATH << p}
           @options[:requires].each {|f| require f}
+
+          if @options[:debug]
+            puts engine.precompiled
+            puts '=' * 100
+          end
+
           result = engine.to_html
         rescue Exception => e
           raise e if @options[:trace]

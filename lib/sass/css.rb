@@ -17,12 +17,6 @@ module Sass
       end
     end
 
-    class ValueNode
-      def to_sass(tabs, opts = {})
-        "#{value}\n"
-      end
-    end
-
     class RuleNode
       def to_sass(tabs, opts = {})
         str = "\n#{'  ' * tabs}#{rule}#{children.any? { |c| c.is_a? AttrNode } ? "\n" : ''}"
@@ -237,7 +231,7 @@ module Sass
       root.children.map! do |child|
         next child unless Tree::RuleNode === child && child.rule.include?(',')
         child.rule.split(',').map do |rule|
-          node = Tree::RuleNode.new(rule, {})
+          node = Tree::RuleNode.new(rule.strip, {})
           node.children = child.children
           node
         end

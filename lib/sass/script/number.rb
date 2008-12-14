@@ -1,17 +1,17 @@
-require 'sass/constant/literal'
+require 'sass/script/literal'
 
-module Sass::Constant
+module Sass::Script
   class Number < Literal # :nodoc:
 
     attr_reader :numerator_units, :denominator_units
 
     PRECISION = 1000.0
 
-    def parse(value)
-      first, second, unit = value.scan(Literal::NUMBER)[0]
-      @value = first.empty? ? second.to_i : "#{first}#{second}".to_f
-      @numerator_units = Array(unit)
-      @denominator_units = []
+    def initialize(value, numerator_units = [], denominator_units = [])
+      super(value)
+      @numerator_units = numerator_units
+      @denominator_units = denominator_units
+      normalize!
     end
 
     def plus(other)
@@ -20,7 +20,7 @@ module Sass::Constant
       elsif other.is_a?(Color)
         other.plus(self)
       else
-        Sass::Constant::String.from_value(self.to_s + other.to_s)
+        Sass::Script::String.new(self.to_s + other.to_s)
       end
     end
 
@@ -33,7 +33,7 @@ module Sass::Constant
     end
 
     def unary_minus
-      Number.from_value(-value, numerator_units, denominator_units)
+      Number.new(-value, numerator_units, denominator_units)
     end
 
     def times(other)
@@ -65,10 +65,30 @@ module Sass::Constant
       end
     end
 
-    def equals(other)
-      Sass::Constant::Bool.from_value(super.to_bool &&
+    def eq(other)
+      Sass::Script::Bool.new(super.to_bool &&
         self.numerator_units.sort == other.numerator_units.sort &&
         self.denominator_units.sort == other.denominator_units.sort)
+    end
+
+    def gt(other)
+      raise NoMethodError.new(nil, :gt) unless other.is_a?(Number)
+      operate(other, :>)
+    end
+
+    def gte(other)
+      raise NoMethodError.new(nil, :gt) unless other.is_a?(Number)
+      operate(other, :>=)
+    end
+
+    def lt(other)
+      raise NoMethodError.new(nil, :gt) unless other.is_a?(Number)
+      operate(other, :<)
+    end
+
+    def lte(other)
+      raise NoMethodError.new(nil, :gt) unless other.is_a?(Number)
+      operate(other, :<=)
     end
 
     def to_s
@@ -100,14 +120,6 @@ module Sass::Constant
 
     protected
 
-    def self.from_value(value, numerator_units = [], denominator_units = [])
-      instance = super(value)
-      instance.instance_variable_set('@numerator_units', numerator_units)
-      instance.instance_variable_set('@denominator_units', denominator_units)
-      instance.send :normalize!
-      instance
-    end
-
     def operate(other, operation)
       this = self
       if [:+, :-].include?(operation)
@@ -117,12 +129,19 @@ module Sass::Constant
           other = other.coerce(numerator_units, denominator_units)
         end
       end
+      # avoid integer division
+      value = (:/ == operation) ? this.value.to_f : this.value
+      result = value.send(operation, other.value)
 
-      Number.from_value(this.value.send(operation, other.value), *compute_units(this, other, operation))
+      if result.is_a?(Numeric)
+        Number.new(result, *compute_units(this, other, operation))
+      else # Boolean op
+        Bool.new(result)
+      end
     end
 
     def coerce(num_units, den_units)
-      Number.from_value(if unitless?
+      Number.new(if unitless?
                           self.value
                         else
                           self.value * coercion_factor(self.numerator_units, num_units) /

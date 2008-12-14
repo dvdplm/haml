@@ -90,6 +90,7 @@ module Haml
 extend Haml::Helpers
 _hamlout = @haml_buffer = Haml::Buffer.new(@haml_buffer, #{options_for_buffer.inspect})
 _erbout = _hamlout.buffer
+__in_erb_template = true
 END
       postamble = <<END.gsub("\n", ";")
 @haml_buffer = @haml_buffer.upper
@@ -102,7 +103,10 @@ END
       names = names.keys if Hash == names
 
       names.map do |name|
-        "#{name} = _haml_locals[#{name.to_sym.inspect}] || _haml_locals[#{name.to_s.inspect}]"
+        # Can't use || because someone might explicitly pass in false with a symbol
+        sym_local = "_haml_locals[#{name.to_sym.inspect}]" 
+        str_local = "_haml_locals[#{name.to_s.inspect}]" 
+        "#{name} = #{sym_local}.nil? ? #{str_local} : #{sym_local}"
       end.join(';') + ';'
     end
 
@@ -211,9 +215,11 @@ END
 
         push_silent(text[1..-1], true)
         newline_now
-        if (block_opened? && !mid_block_keyword?(text)) || text[1..-1].split(' ', 2)[0] == "case"
-          push_and_tabulate([:script])
-        end
+
+        case_stmt = text[1..-1].split(' ', 2)[0] == "case"
+        block = block_opened? && !mid_block_keyword?(text)
+        push_and_tabulate([:script]) if block || case_stmt
+        push_and_tabulate(nil)       if block && case_stmt
       when FILTER; start_filtered(text[1..-1].downcase)
       when DOCTYPE
         return render_doctype(text) if text[0...3] == '!!!'
@@ -338,6 +344,7 @@ END
       when :loud; close_loud value
       when :filtered; close_filtered value
       when :haml_comment; close_haml_comment
+      when nil; close_nil
       end
     end
 
@@ -385,6 +392,10 @@ END
 
     def close_haml_comment
       @haml_comment = false
+      @template_tabs -= 1
+    end
+
+    def close_nil
       @template_tabs -= 1
     end
 
@@ -527,7 +538,7 @@ END
       preserve_tag &&= !options[:ugly]
 
       case action
-      when '/'; self_closing = xhtml?
+      when '/'; self_closing = true
       when '~'; parse = preserve_script = true
       when '='
         parse = true
@@ -667,6 +678,8 @@ END
             case type
             when "strict";   '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">'
             when "frameset"; '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Frameset//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-frameset.dtd">'
+            when "mobile";   '<!DOCTYPE html PUBLIC "-//WAPFORUM//DTD XHTML Mobile 1.2//EN" "http://www.openmobilealliance.org/tech/DTD/xhtml-mobile12.dtd">'
+            when "basic";    '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML Basic 1.1//EN" "http://www.w3.org/TR/xhtml-basic/xhtml-basic11.dtd">'
             else             '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">'
             end
           end

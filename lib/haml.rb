@@ -1,5 +1,5 @@
 dir = File.dirname(__FILE__)
-$LOAD_PATH << dir unless $LOAD_PATH.include?(dir)
+$LOAD_PATH.unshift dir unless $LOAD_PATH.include?(dir)
 
 # = Haml (XHTML Abstraction Markup Language)
 #
@@ -39,7 +39,7 @@ $LOAD_PATH << dir unless $LOAD_PATH.include?(dir)
 # Once it's installed, all view files with the ".html.haml" extension
 # will be compiled using Haml.
 #
-# To run Haml from the commandline, just use
+# To run Haml from the command line, just use
 #
 #   haml input.haml output.html
 #
@@ -190,6 +190,9 @@ $LOAD_PATH << dir unless $LOAD_PATH.include?(dir)
 # would compile to:
 #
 #   <sandwich bread='whole wheat' delicious='true' filling='peanut butter and jelly' />
+#
+# Note that the Haml attributes list has the same syntax as a Ruby method call.
+# This means that any attribute methods must come before the hash literal.
 #
 # ===== Boolean Attributes
 #
@@ -512,6 +515,22 @@ $LOAD_PATH << dir unless $LOAD_PATH.include?(dir)
 #
 #   <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 #
+# while 
+#
+#   !!! Basic
+#
+# is compiled to:
+#
+#   <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML Basic 1.1//EN" "http://www.w3.org/TR/xhtml-basic/xhtml-basic11.dtd"> 
+#
+# and
+#   
+#   !!! Mobile
+#
+# is compiled to: 
+#
+#   <!DOCTYPE html PUBLIC "-//WAPFORUM//DTD XHTML Mobile 1.2//EN" "http://www.openmobilealliance.org/tech/DTD/xhtml-mobile12.dtd">
+#
 # If you're not using the UTF-8 character set for your document,
 # you can specify which encoding should appear
 # in the XML prolog in a similar way.
@@ -573,7 +592,7 @@ $LOAD_PATH << dir unless $LOAD_PATH.include?(dir)
 #     </a>
 #   <![endif]-->
 #
-# ==== \
+# ==== \ 
 #
 # The backslash character escapes the first character of a line,
 # allowing use of otherwise interpreted characters as plain text.
@@ -922,9 +941,9 @@ $LOAD_PATH << dir unless $LOAD_PATH.include?(dir)
 #
 #   Haml::Template.options[:format] = :html5
 #
-# ...or by setting the <tt>Merb::Config[:haml]</tt> hash in <tt>init.rb</tt> in Merb...
+# ...or by setting the <tt>Merb::Plugin.config[:haml]</tt> hash in <tt>init.rb</tt> in Merb...
 #
-#   Merb::Config[:haml][:format] = :html5
+#   Merb::Plugin.config[:haml][:format] = :html5
 # 
 # ...or by passing an options hash to Haml::Engine.new.
 # Available options are:
@@ -1041,4 +1060,5 @@ module Haml
   end
 end
 
+require 'haml/util'
 require 'haml/engine'
