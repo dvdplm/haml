@@ -254,24 +254,23 @@ module Haml
     # the local variable <tt>foo</tt> would be assigned to "<p>13</p>\n".
     #
     def capture_haml(*args, &block)
-      buffer = eval('_hamlout', block) rescue haml_buffer
+      buffer = eval('_hamlout', block.binding) rescue haml_buffer
       with_haml_buffer(buffer) do
         position = haml_buffer.buffer.length
 
         block.call(*args)
 
         captured = haml_buffer.buffer.slice!(position..-1)
-
         min_tabs = nil
-        captured.each do |line|
+        captured.each_line do |line|
           tabs = line.index(/[^ ]/)
           min_tabs ||= tabs
           min_tabs = min_tabs > tabs ? tabs : min_tabs
         end
 
-        result = captured.map do |line|
+        result = captured.split($/).map do |line|
           line[min_tabs..-1]
-        end
+        end.join
         result.to_s
       end
     end
@@ -407,9 +406,10 @@ END
 
     # Returns whether or not +block+ is defined directly in a Haml template.
     def block_is_haml?(block)
-      eval('_hamlout', block)
+      eval('_hamlout', block.binding)
       true
-    rescue
+    rescue => e
+      ActiveRecord::Base.logger.error "ERROR IN block_is_haml? #{e.message}\n Backtrace: #{e.backtrace.join("\t\n\t")}"
       false
     end
 
@@ -442,28 +442,6 @@ END
       _erbout = _hamlout.buffer
       proc { |*args| proc.call(*args) }
     end
-    
-    # Performs the function of capture_haml, assuming <tt>local_buffer</tt>
-    # is where the output of block goes.
-    def capture_haml_with_buffer(local_buffer, *args, &block)
-      position = local_buffer.length
-
-      block.call(*args)
-
-      captured = local_buffer.slice!(position..-1)
-
-      min_tabs = nil
-      captured.each_line do |line|
-        tabs = line.index(/[^ ]/)
-        min_tabs ||= tabs
-        min_tabs = min_tabs > tabs ? tabs : min_tabs
-      end
-
-      result = captured.lines do |line|
-        line[min_tabs..-1]
-      end
-      result.to_s
-    end
 
     include ActionViewExtensions if self.const_defined? "ActionViewExtensions"
   end
@@ -480,4 +458,3 @@ class Object
     false
   end
 end
-
