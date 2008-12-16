@@ -480,4 +480,3 @@ class Object
     false
   end
 end
-
