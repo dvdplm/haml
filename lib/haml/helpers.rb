@@ -407,8 +407,9 @@ END
 
     # Returns whether or not +block+ is defined directly in a Haml template.
     def block_is_haml?(block)
-      eval('_hamlout', block)
+      eval('_hamlout', block.binding)
       true
+      # TODO: differentiate rescues here so real exceptions actually raise.
     rescue
       false
     end
