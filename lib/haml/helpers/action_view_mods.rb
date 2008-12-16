@@ -174,4 +174,3 @@ if defined?(ActionView) and not defined?(Merb::Plugins)
     end
   end
 end
-
