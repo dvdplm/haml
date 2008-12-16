@@ -17,15 +17,14 @@ if defined?(ActionView) and not defined?(Merb::Plugins)
       alias_method :render, :render_with_haml
 
       # Rails >2.1
-      # if instance_methods.include?('output_buffer')
-      if Rails.version > '2.1.2'
+      if instance_methods.include?('output_buffer')
         def output_buffer_with_haml
           return haml_buffer.buffer if is_haml?
           output_buffer_without_haml
         end
         alias_method :output_buffer_without_haml, :output_buffer
         alias_method :output_buffer, :output_buffer_with_haml
-        
+
         def set_output_buffer_with_haml(new)
           if is_haml?
             haml_buffer.buffer = new
@@ -45,24 +44,23 @@ if defined?(ActionView) and not defined?(Merb::Plugins)
       # In Rails <=2.1, we've got to override considerable capturing infrastructure.
       # In Rails >2.1, we can make do with only overriding #capture
       # (which no longer behaves differently in helper contexts).
-      if Rails.version <= "2.1.2"
+      unless ActionView::Base.instance_methods.include?('output_buffer')
         module CaptureHelper
           def capture_with_haml(*args, &block)
             # Rails' #capture helper will just return the value of the block
             # if it's not actually in the template context,
             # as detected by the existance of an _erbout variable.
             # We've got to do the same thing for compatibility.
+
             if is_haml? && block_is_haml?(block)
-              # ActiveRecord::Base.logger.debug "capture_with_haml calling capture_haml because block is HAML"
               capture_haml(*args, &block)
             else
-              # ActiveRecord::Base.logger.debug "capture_with_haml calling capture_without_haml because block is NOT HAML"
               capture_without_haml(*args, &block)
             end
           end
           alias_method :capture_without_haml, :capture
           alias_method :capture, :capture_with_haml
-        
+
           def capture_erb_with_buffer_with_haml(buffer, *args, &block)
             if is_haml?
               capture_haml(*args, &block)
@@ -70,17 +68,15 @@ if defined?(ActionView) and not defined?(Merb::Plugins)
               capture_erb_with_buffer_without_haml(buffer, *args, &block)
             end
           end
-          # alias_method :capture_erb_with_buffer_without_haml, :capture_erb_with_buffer
-          # alias_method :capture_erb_with_buffer, :capture_erb_with_buffer_with_haml
+          alias_method :capture_erb_with_buffer_without_haml, :capture_erb_with_buffer
+          alias_method :capture_erb_with_buffer, :capture_erb_with_buffer_with_haml
         end
-        
+
         module TextHelper
           def concat_with_haml(string, binding = nil)
             if is_haml?
-              # ActiveRecord::Base.logger.debug "concat_with_haml Appending to haml_buffer: #{haml_buffer.buffer.inspect}"
               haml_buffer.buffer.concat(string)
             else
-              # ActiveRecord::Base.logger.debug "concat_with_haml Using standard buffer, because this is NOT haml"
               concat_without_haml(string, binding)
             end
           end
@@ -89,14 +85,10 @@ if defined?(ActionView) and not defined?(Merb::Plugins)
         end
       else
         module CaptureHelper
-          # ActiveRecord::Base.logger.debug "Rails is cool, overriding less stuff: #{Rails.version}"
           def capture_with_haml(*args, &block)
-            # ActiveRecord::Base.logger.debug "capture_with_haml args: #{args.inspect} block: #{block.inspect} is_haml? #{is_haml?} block_is_haml? #{block_is_haml?(block)}"
             if is_haml? && block_is_haml?(block)
-              # ActiveRecord::Base.logger.debug "capture_haml args: #{args.inspect}"
               capture_haml(*args, &block)
             else
-              # ActiveRecord::Base.logger.debug "\t\tcapture_without_haml args: #{args.inspect}"
               capture_without_haml(*args, &block)
             end
           end
@@ -182,3 +174,4 @@ if defined?(ActionView) and not defined?(Merb::Plugins)
     end
   end
 end
+
