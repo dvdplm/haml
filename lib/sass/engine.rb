@@ -22,6 +22,7 @@ module Sass
   Mixin = Struct.new(:name, :args, :environment, :tree)
   # :startdoc:
 
+
   # This is the class where all the parsing and processing of the Sass
   # template is done. It can be directly used by the user by creating a
   # new instance and calling <tt>render</tt> to render the template. For example:
