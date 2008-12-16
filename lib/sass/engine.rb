@@ -22,7 +22,6 @@ module Sass
   Mixin = Struct.new(:name, :args, :environment, :tree)
   # :startdoc:
 
-
   # This is the class where all the parsing and processing of the Sass
   # template is done. It can be directly used by the user by creating a
   # new instance and calling <tt>render</tt> to render the template. For example:
@@ -130,7 +129,7 @@ module Sass
     def tabulate(string)
       tab_str = nil
       first = true
-      string.gsub(/\r|\n|\r\n|\r\n/, "\n").scan(/^.*?$/).enum_with_index.map do |line, index|
+      string.gsub(/\r|\n|\r\n|\r\n/, "\n").scan(/^.*?$/).each_with_index.map do |line, index|
         index += 1
         next if line.strip.empty? || line =~ /^\/\//
 
