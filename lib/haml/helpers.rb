@@ -254,7 +254,7 @@ module Haml
     # the local variable <tt>foo</tt> would be assigned to "<p>13</p>\n".
     #
     def capture_haml(*args, &block)
-      buffer = eval('_hamlout', block) rescue haml_buffer
+      buffer = eval('_hamlout', block.binding) rescue haml_buffer
       with_haml_buffer(buffer) do
         position = haml_buffer.buffer.length
 
@@ -263,15 +263,15 @@ module Haml
         captured = haml_buffer.buffer.slice!(position..-1)
 
         min_tabs = nil
-        captured.each do |line|
+        captured.each_line do |line|
           tabs = line.index(/[^ ]/)
           min_tabs ||= tabs
           min_tabs = min_tabs > tabs ? tabs : min_tabs
         end
 
-        result = captured.map do |line|
-          line[min_tabs..-1]
-        end
+        result = captured.split($/).map do |line|
+          line[min_tabs..-1]  # TODO: Not encoding safe (for Ruby 1.9)
+        end.join
         result.to_s
       end
     end
@@ -480,3 +480,4 @@ class Object
     false
   end
 end
+
